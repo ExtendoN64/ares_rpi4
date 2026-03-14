@@ -1,0 +1,9 @@
+# Force LF line endings for shell scripts (must be LF on Linux)
+*.sh text eol=lf
+
+# Python files — LF preferred but works with either
+*.py text eol=lf
+
+# Keep these as-is
+*.md text eol=lf
+*.txt text eol=lf
