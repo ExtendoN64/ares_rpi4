@@ -1,0 +1,26 @@
+# ARES RPi4 Test Suite — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# I2C bus communication (used by i2c_scanner.py)
+smbus2>=0.4.0
+
+# PCA9685 servo control via OSOYOO PWM HAT v2.0 (used by servo_test.py)
+adafruit-circuitpython-servokit>=1.3.0
+
+# CircuitPython compatibility layer for Raspberry Pi Linux (required by Adafruit libs)
+Adafruit-Blinka>=8.0.0
+
+# GPIO control for DRV8833 motor drivers (used by motor_test.py, i2c_scanner.py)
+# RPi.GPIO is pre-installed on Raspberry Pi OS.
+# Uncomment the line below only if it's missing on your system:
+# RPi.GPIO>=0.7.0
+
+# Encoder reading via pigpio daemon (used by motor_test.py for CQR37D encoders)
+# pigpio is pre-installed on Raspberry Pi OS but may need the Python bindings.
+# IMPORTANT: The pigpio daemon must be running: sudo pigpiod
+# To auto-start on boot: sudo systemctl enable pigpiod
+pigpio>=1.78
+
+# Linux input subsystem for Bluetooth gamepad support (used by controller_test.py)
+# Only available on Linux — not needed for servo/motor/I2C tests.
+evdev>=1.6.0
