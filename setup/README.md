@@ -12,8 +12,7 @@ git clone https://github.com/ExtendoN64/ares_rpi4.git
 cd ares_rpi4
 
 # Run the setup script
-chmod +x setup/setup.sh
-sudo ./setup/setup.sh
+sudo python3 setup/setup.py
 
 # Log out and back in (for group permissions)
 logout
@@ -166,8 +165,7 @@ logout
 
 ### Automated (recommended)
 ```bash
-chmod +x setup/bluetooth_pair.sh
-./setup/bluetooth_pair.sh
+python3 setup/bluetooth_pair.py
 ```
 
 ### Manual pairing with bluetoothctl
