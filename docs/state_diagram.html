@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ARES RPi4 — Macro-Level State Diagram</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    h1 {
+      margin: 24px 0 4px;
+      font-size: 1.5rem;
+      letter-spacing: 0.5px;
+    }
+    .subtitle {
+      color: #8b949e;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+    }
+    .mermaid {
+      width: 95%;
+      max-width: 1200px;
+    }
+    .mermaid svg {
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>ARES RPi4 — Macro-Level State Diagram</h1>
+  <p class="subtitle">combined_test.py orchestrator &amp; subsystem lifecycles</p>
+
+  <pre class="mermaid">
+stateDiagram-v2
+    direction TB
+
+    [*] --> Startup
+
+    state Startup {
+        [*] --> PrintBanner
+        PrintBanner --> CheckPigpiod
+        CheckPigpiod --> WarnEncoders : pigpiod not running
+        CheckPigpiod --> MainMenu : pigpiod OK
+        WarnEncoders --> MainMenu
+    }
+
+    state MainMenu {
+        [*] --> AwaitInput
+        AwaitInput --> DispatchChoice : user selects 1‑7
+        AwaitInput --> Exit : user selects 0 / Ctrl+C
+        DispatchChoice --> AwaitInput : action complete
+    }
+
+    MainMenu --> I2CScan : option 1
+    MainMenu --> GPIOCheck : option 2
+    MainMenu --> MotorTest : option 3
+    MainMenu --> ServoTest : option 4
+    MainMenu --> QuickCheck : option 5
+    MainMenu --> HelpInfo : option 6
+    MainMenu --> GamepadMode : option 7
+    MainMenu --> [*] : Exit
+
+    state I2CScan {
+        [*] --> ScanBus
+        ScanBus --> PrintGrid
+        PrintGrid --> ValidatePCA9685 : 0x40 found
+        PrintGrid --> ReportMissing : not found
+        ValidatePCA9685 --> [*]
+        ReportMissing --> [*]
+    }
+    I2CScan --> MainMenu
+
+    state GPIOCheck {
+        [*] --> ReadAllPins
+        ReadAllPins --> PrintPinResults
+        PrintPinResults --> [*]
+    }
+    GPIOCheck --> MainMenu
+
+    state MotorTest {
+        [*] --> MC_Setup
+        MC_Setup --> MC_InitGPIO
+        MC_InitGPIO --> MC_InitEncoders : pigpiod available
+        MC_InitGPIO --> MC_InteractiveLoop : no pigpiod
+        MC_InitEncoders --> MC_InteractiveLoop
+
+        state MC_InteractiveLoop {
+            [*] --> MC_Prompt
+            MC_Prompt --> MC_ParseCmd
+            MC_ParseCmd --> MC_SetDirection : fwd / rev / coast / brake
+            MC_ParseCmd --> MC_SetSpeed : speed &lt;duty&gt;
+            MC_ParseCmd --> MC_ReadEncoder : enc
+            MC_ParseCmd --> MC_Prompt : unknown cmd
+            MC_SetDirection --> MC_Prompt
+            MC_SetSpeed --> MC_Prompt
+            MC_ReadEncoder --> MC_Prompt
+            MC_ParseCmd --> MC_Quit : quit
+        }
+        MC_Quit --> MC_Cleanup
+        MC_Cleanup --> [*]
+    }
+    MotorTest --> MainMenu
+
+    state ServoTest {
+        [*] --> SC_Setup
+        SC_Setup --> SC_InitI2C
+        SC_InitI2C --> SC_InteractiveLoop
+
+        state SC_InteractiveLoop {
+            [*] --> SC_Prompt
+            SC_Prompt --> SC_ParseCmd
+            SC_ParseCmd --> SC_SetAngle : angle &lt;deg&gt;
+            SC_ParseCmd --> SC_Center : center
+            SC_ParseCmd --> SC_Sweep : sweep
+            SC_ParseCmd --> SC_Nudge : nudge &lt;±deg&gt;
+            SC_ParseCmd --> SC_SetLimits : setmin / setmax
+            SC_ParseCmd --> SC_Release : release
+            SC_SetAngle --> SC_Prompt
+            SC_Center --> SC_Prompt
+            SC_Sweep --> SC_Prompt
+            SC_Nudge --> SC_Prompt
+            SC_SetLimits --> SC_Prompt
+            SC_Release --> SC_Prompt
+            SC_ParseCmd --> SC_Quit : quit
+        }
+        SC_Quit --> SC_ReleaseAll
+        SC_ReleaseAll --> [*]
+    }
+    ServoTest --> MainMenu
+
+    state QuickCheck {
+        [*] --> QC_I2CScan
+        QC_I2CScan --> QC_GPIOCheck
+        QC_GPIOCheck --> QC_MotorBrief : GPIO OK + user confirms
+        QC_GPIOCheck --> QC_SkipMotor : GPIO fail
+        QC_MotorBrief --> QC_VerifyEncoders
+        QC_VerifyEncoders --> QC_ServoBrief : PCA9685 found
+        QC_VerifyEncoders --> QC_SkipServo : PCA9685 missing
+        QC_SkipMotor --> QC_ServoBrief : PCA9685 found
+        QC_SkipMotor --> QC_SkipServo : PCA9685 missing
+        QC_ServoBrief --> QC_Summary
+        QC_SkipServo --> QC_Summary
+        QC_Summary --> [*]
+    }
+    QuickCheck --> MainMenu
+
+    state HelpInfo {
+        [*] --> PrintHardwareInfo
+        PrintHardwareInfo --> [*]
+    }
+    HelpInfo --> MainMenu
+
+    state GamepadMode {
+        [*] --> GP_Setup
+
+        state GP_Setup {
+            [*] --> GP_InitMotors
+            GP_InitMotors --> GP_InitServos
+            GP_InitServos --> GP_FindGamepad
+        }
+
+        GP_FindGamepad --> GP_NoGamepad : not found
+        GP_FindGamepad --> GP_EventLoop : gamepad found
+
+        GP_NoGamepad --> GP_ListDevices
+        GP_ListDevices --> GP_Cleanup
+
+        state GP_EventLoop {
+            [*] --> GP_ReadEvents
+            GP_ReadEvents --> GP_ProcessEvent : event received
+            GP_ProcessEvent --> GP_UpdateMotors : stick axes
+            GP_ProcessEvent --> GP_UpdateServos : right stick Y
+            GP_ProcessEvent --> GP_EmergencyStop : A / Cross
+            GP_ProcessEvent --> GP_ToggleMode : Y / Triangle
+            GP_ProcessEvent --> GP_CycleWheel : B / L1
+            GP_ProcessEvent --> GP_CycleServo : X / R1
+            GP_UpdateMotors --> GP_PrintStatus
+            GP_UpdateServos --> GP_PrintStatus
+            GP_EmergencyStop --> GP_PrintStatus
+            GP_ToggleMode --> GP_PrintStatus
+            GP_CycleWheel --> GP_PrintStatus
+            GP_CycleServo --> GP_PrintStatus
+            GP_PrintStatus --> GP_ReadEvents
+        }
+
+        GP_EventLoop --> GP_Cleanup : Ctrl+C
+
+        state GP_Cleanup {
+            [*] --> GP_StopMotors
+            GP_StopMotors --> GP_ReleaseServos
+            GP_ReleaseServos --> GP_CloseDevice
+            GP_CloseDevice --> [*]
+        }
+    }
+    GP_Cleanup --> MainMenu
+  </pre>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        primaryColor: '#1f6feb',
+        primaryTextColor: '#e6edf3',
+        primaryBorderColor: '#388bfd',
+        lineColor: '#8b949e',
+        secondaryColor: '#161b22',
+        tertiaryColor: '#21262d',
+        noteBkgColor: '#161b22',
+        noteTextColor: '#8b949e',
+      },
+      state: {
+        padding: 12,
+        dividerColor: '#30363d',
+        defaultRenderer: 'dagre-wrapper',
+      },
+      fontFamily: '"Segoe UI", system-ui, sans-serif',
+      fontSize: 13,
+    });
+  </script>
+</body>
+</html>
